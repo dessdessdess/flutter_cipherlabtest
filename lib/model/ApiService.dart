@@ -32,6 +32,53 @@ class ApiService {
         storageGuid: "storageGuid",
         storage: "storage");
   }
+
+  static Future<List<InventoryDoc>> getTasksInProgress(int index) async {
+    return [
+      const InventoryDoc(
+          number: 'Г0001361',
+          date: '19.05.2023',
+          warehouse: 'Тамбов 1, Тулиновская 6 ',
+          docType: 'Инвентаризация товаров на складе ',
+          guid: '123',
+          goods: []),
+      const InventoryDoc(
+          number: 'Г0001362',
+          date: '20.05.2023',
+          warehouse: 'Тамбов 1, Тулиновская 6 ',
+          docType: 'Инвентаризация товаров на складе ',
+          guid: '124',
+          goods: []),
+      const InventoryDoc(
+          number: 'Г0001363',
+          date: '21.05.2023',
+          warehouse: 'Тамбов 1, Тулиновская 6 ',
+          docType: 'Инвентаризация товаров на складе ',
+          guid: '125',
+          goods: []),
+      const InventoryDoc(
+          number: 'Г0001364',
+          date: '22.05.2023',
+          warehouse: 'Тамбов 1, Тулиновская 6 ',
+          docType: 'Инвентаризация товаров на складе ',
+          guid: '123',
+          goods: []),
+      const InventoryDoc(
+          number: 'Г0001365',
+          date: '23.05.2023',
+          warehouse: 'Тамбов 1, Тулиновская 6 ',
+          docType: 'Инвентаризация товаров на складе ',
+          guid: '124',
+          goods: []),
+      const InventoryDoc(
+          number: 'Г0001366',
+          date: '24.05.2023',
+          warehouse: 'Тамбов 1, Тулиновская 6 ',
+          docType: 'Инвентаризация товаров на складе ',
+          guid: '125',
+          goods: [])
+    ];
+  }
 }
 
 class AuthInfo {

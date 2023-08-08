@@ -96,6 +96,7 @@ class AuthScreenState extends State<AuthScreen> {
           ? const Center(
               child: Text(
                 'Отсканируйте штрихкод авторизации',
+                textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
               ),
             )
