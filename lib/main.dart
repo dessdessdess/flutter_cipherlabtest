@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_cipherlabtest/HomePage.dart';
 import 'package:flutter_cipherlabtest/model/SharedPrefData.dart';
 import 'package:flutter_cipherlabtest/authScreen.dart';
 import 'mainScreen.dart';
@@ -46,6 +47,7 @@ class _MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: isAuthorized ? const MainScreen() : const AuthScreen());
+        //home: isAuthorized ? const MainScreen() : const AuthScreen());
+        home: HomePage());
   }
 }
