@@ -7,8 +7,12 @@ import 'package:flutter_cipherlabtest/model/ApiService.dart';
 import 'package:flutter_cipherlabtest/model/SharedPrefData.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'model/Recources.dart';
+
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  SharedData sharedData;
+
+  AuthScreen({super.key, required this.sharedData});
 
   @override
   State<StatefulWidget> createState() {
@@ -19,9 +23,26 @@ class AuthScreen extends StatefulWidget {
 class AuthScreenState extends State<AuthScreen> {
   static const eventChannel = EventChannel('samples.flutter.dev/getscancode');
 
-  String user = '';
+  late SharedData sharedData;
+
+  String _user = '';
+  bool _passwordCorrect = true;
+
   final TextEditingController _passwordEditingController =
       TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    sharedData = widget.sharedData;
+    scanEventHandle();
+    _passwordEditingController.addListener(() {
+      if (_passwordEditingController.text.isEmpty) {
+        _passwordCorrect = true;
+        setState(() {});
+      }
+    });
+  }
 
   Future<void> scanEventHandle() async {
     try {
@@ -42,7 +63,7 @@ class AuthScreenState extends State<AuthScreen> {
         (authInfo) {
           setData(authInfo);
           setState(() {
-            user = authInfo.user;
+            _user = authInfo.user;
           });
         },
       );
@@ -51,31 +72,27 @@ class AuthScreenState extends State<AuthScreen> {
 
   void _onError(Object error) {
     setState(() {
-      user = '';
+      _user = '';
     });
   }
 
   setData(AuthInfo authInfo) async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('sharedData', jsonEncode(authInfo.toJson()));
+    final sharedDataString = jsonEncode(authInfo.toJson());
+
+    prefs.setString('sharedData', sharedDataString);
+    sharedData = SharedData.fromJson(json.decode(sharedDataString));
   }
 
   loginButtonTapped() {
-    Navigator.pop(context);
+    final currentPassword = _passwordEditingController.text;
 
-    //var password = _passwordEditingController.text;
-    // SharedPrefData.passwordVerificationPassed(password).then((isAuthorised) {
-    //   if (isAuthorised) {
-    //     FocusScope.of(context).requestFocus(FocusNode());
-    //     saveIsAuthorised();
-    //     Navigator.pushAndRemoveUntil(
-    //         context,
-    //         MaterialPageRoute<dynamic>(
-    //           builder: (BuildContext context) => const MainScreen(),
-    //         ),
-    //         (route) => false);
-    //   }
-    // });
+    if (currentPassword == sharedData.pin) {
+      Navigator.pop(context, sharedData);
+    } else {
+      _passwordCorrect = false;
+      setState(() {});
+    }
   }
 
   Future<void> saveIsAuthorised() async {
@@ -84,18 +101,12 @@ class AuthScreenState extends State<AuthScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    scanEventHandle();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Авторизация"),
+        title: const Text("Авторизация"),
       ),
-      body: user.isEmpty
+      body: _user.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -119,15 +130,15 @@ class AuthScreenState extends State<AuthScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(left: 8, right: 8),
+                  padding: const EdgeInsets.only(left: 16, right: 16),
                   child: Text(
-                    user,
+                    _user,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 24),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                   child: TextField(
                     controller: _passwordEditingController,
                     obscureText: true,
@@ -137,15 +148,27 @@ class AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                 ),
+                _passwordCorrect
+                    ? const SizedBox(
+                        height: 0,
+                      )
+                    : const Padding(
+                        padding:
+                            EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                        child: Text(
+                          'Неправильный пароль!',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 8.0, right: 8),
+                  padding: const EdgeInsets.only(left: 16, right: 16),
                   child: ElevatedButton(
                       onPressed: loginButtonTapped,
                       child: const Padding(
-                        padding: EdgeInsets.all(8.0),
+                        padding: EdgeInsets.all(12.0),
                         child: Text(
                           'Войти',
-                          style: TextStyle(fontSize: 32),
+                          style: TextStyle(fontSize: 24),
                         ),
                       )),
                 ),

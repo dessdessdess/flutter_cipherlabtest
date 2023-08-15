@@ -40,20 +40,32 @@ class _HomePageState extends State<HomePage> {
 
   var currentTabIndex = 0;
 
+  bool _tasksIsFetching = false;
+
   @override
   initState() {
     super.initState();
     searchController.addListener(searchQueryChanged);
 
-    loadData();
+    loadSharedData();
   }
 
-  loadData() async {
+  loadSharedData() async {
     final pref = await SharedPreferences.getInstance();
     final sharedDataString = pref.getString("sharedData") ?? "";
     if (sharedDataString.isNotEmpty) {
       sharedData = SharedData.fromJson(json.decode(sharedDataString));
     }
+  }
+
+  clearSharedData() async {
+    final pref = await SharedPreferences.getInstance();
+    await pref.clear().then((value) {
+      sharedData = SharedData.shared;
+      listOfTasks.clear();
+      listOfWorkTasks.clear();
+      setState(() {});
+    });
   }
 
   searchQueryChanged() {
@@ -181,7 +193,7 @@ class _HomePageState extends State<HomePage> {
     return Center(
       child: RefreshIndicator(
         onRefresh: () async {
-          await Future<void>.delayed(const Duration(seconds: 2));
+          await Future<void>.delayed(const Duration(seconds: 1));
 
           setState(() {
             listOfWorkTasks = WorkTask.getExampleWorkTasks();
@@ -214,75 +226,127 @@ class _HomePageState extends State<HomePage> {
 
   Center kdTasks() {
     return Center(
-      child: RefreshIndicator(
-        onRefresh: () async {
-          await Future<void>.delayed(const Duration(seconds: 2));
-          setState(() {
-            countOfSelectedTasks = 0;
-            listOfTasks = Task.getExampleTasks();
-            filteredListOfTasks = listOfTasks;
-          });
-        },
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.separated(
-                  itemCount: filteredListOfTasks.length,
-                  separatorBuilder: (context, index) => const Divider(
-                        height: 1,
-                      ),
-                  itemBuilder: ((context, index) {
-                    final task = filteredListOfTasks[index];
-
-                    return Padding(
-                      padding: EdgeInsets.zero,
-                      child: ListTile(
-                        leading: task.selected
-                            ? const Icon(
-                                Icons.check_box,
-                                color: Colors.blue,
-                              )
-                            : const Icon(
-                                Icons.check_box_outline_blank,
-                              ),
-                        title: Padding(
-                          padding: EdgeInsets.zero,
-                          child: Text(task.docType),
-                        ),
-                        subtitle: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Flexible(child: Text(task.number)),
-                              Text(DateFormat('dd.MM.yyyy').format(task.date))
-                            ]),
-                        onTap: () {
+      child: listOfTasks.isEmpty
+          ? Builder(builder: (context) {
+              return _tasksIsFetching
+                  ? Image.asset(
+                      'assets/images/loading.gif',
+                      height: 50,
+                      width: 50,
+                    )
+                  : OutlinedButton(
+                      onPressed: () {
+                        if (sharedData.userName.isEmpty) {
+                          showModalBottomSheet(
+                              shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20))),
+                              context: context,
+                              builder: (context) => Center(
+                                      child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'Пожалуйста, авторизуйтесь',
+                                        style: TextStyle(fontSize: 24),
+                                      ),
+                                      SizedBox(height: 16),
+                                      OutlinedButton(
+                                        child: const Text('ОК'),
+                                        onPressed: () => Navigator.pop(context),
+                                      ),
+                                    ],
+                                  )));
+                        } else {
                           setState(() {
-                            task.selected = !task.selected;
-
-                            countOfSelectedTasks = listOfTasks
-                                .where((element) => element.selected == true)
-                                .length;
+                            _tasksIsFetching = true;
                           });
-                        },
-                      ),
-                    );
-                  })),
+                          fetchTasks();
+                        }
+                      },
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_outlined),
+                          Text('Обновить'),
+                        ],
+                      ));
+            })
+          : RefreshIndicator(
+              onRefresh: fetchTasks,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.separated(
+                        itemCount: filteredListOfTasks.length,
+                        separatorBuilder: (context, index) => const Divider(
+                              height: 1,
+                            ),
+                        itemBuilder: ((context, index) {
+                          final task = filteredListOfTasks[index];
+
+                          return Padding(
+                            padding: EdgeInsets.zero,
+                            child: ListTile(
+                              leading: task.selected
+                                  ? const Icon(
+                                      Icons.check_box,
+                                      color: Colors.blue,
+                                    )
+                                  : const Icon(
+                                      Icons.check_box_outline_blank,
+                                    ),
+                              title: Padding(
+                                padding: EdgeInsets.zero,
+                                child: Text(task.docType),
+                              ),
+                              subtitle: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(child: Text(task.number)),
+                                    Text(DateFormat('dd.MM.yyyy')
+                                        .format(task.date))
+                                  ]),
+                              onTap: () {
+                                setState(() {
+                                  task.selected = !task.selected;
+
+                                  countOfSelectedTasks = listOfTasks
+                                      .where(
+                                          (element) => element.selected == true)
+                                      .length;
+                                });
+                              },
+                            ),
+                          );
+                        })),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: SizedBox(
+                        height: 50,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                            onPressed: () {},
+                            child: Text(countOfSelectedTasks == 0
+                                ? "Принять задания"
+                                : "Принять задания ($countOfSelectedTasks)"))),
+                  )
+                ],
+              ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: SizedBox(
-                  height: 50,
-                  width: double.infinity,
-                  child: ElevatedButton(
-                      onPressed: () {},
-                      child: Text(countOfSelectedTasks == 0
-                          ? "Принять задания"
-                          : "Принять задания ($countOfSelectedTasks)"))),
-            )
-          ],
-        ),
-      ),
     );
+  }
+
+  Future<void> fetchTasks() async {
+    await Future<void>.delayed(const Duration(seconds: 1));
+    setState(() {
+      countOfSelectedTasks = 0;
+      listOfTasks = Task.getExampleTasks();
+      filteredListOfTasks = listOfTasks;
+      _tasksIsFetching = false;
+    });
   }
 
   Drawer kdDrawer() {
@@ -303,16 +367,15 @@ class _HomePageState extends State<HomePage> {
                                 onPressed: () {
                                   Navigator.push(context, MaterialPageRoute(
                                     builder: (context) {
-                                      return AuthScreen();
+                                      return AuthScreen(sharedData: sharedData);
                                     },
                                   )).then((value) {
-                                    setState(() {
-                                      loadData();
-                                    });
+                                    sharedData = value;
+                                    setState(() {});
                                   });
                                 },
-                                icon: Icon(Icons.account_box),
-                                label: Text("Авторизоваться")),
+                                icon: const Icon(Icons.account_box),
+                                label: const Text("Авторизоваться")),
                           ],
                         )
                       : Column(
@@ -333,7 +396,7 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 IconButton(
                                     onPressed: () {
-                                      print("object");
+                                      clearSharedData();
                                     },
                                     iconSize: 24,
                                     icon: const Icon(Icons.exit_to_app)),

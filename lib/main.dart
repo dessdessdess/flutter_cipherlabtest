@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cipherlabtest/HomePage.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 // import 'package:flutter_cipherlabtest/model/SharedPrefData.dart';
 // import 'package:flutter_cipherlabtest/authScreen.dart';
 // import 'mainScreen.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
+//import 'package:flutter_native_splash/flutter_native_splash.dart';
 
-void main() async {
+void main() {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
