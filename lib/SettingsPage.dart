@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_cipherlabtest/model/Recources.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Настройки"),
+        title: const Text('Настройки'),
       ),
-      body: const Center(child: Text("Настройки")),
+      body: Center(child: Text('Настройки')),
     );
   }
 }

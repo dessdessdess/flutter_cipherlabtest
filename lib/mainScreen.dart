@@ -20,15 +20,15 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
 
-    SharedPrefData.getUser().then((value) {
-      user = value;
-      setState(() {});
-    });
+    // SharedPrefData.getUser().then((value) {
+    //   user = value;
+    //   setState(() {});
+    // });
 
-    SharedPrefData.getStorage().then((value) {
-      storage = value;
-      setState(() {});
-    });
+    // SharedPrefData.getStorage().then((value) {
+    //   storage = value;
+    //   setState(() {});
+    // });
   }
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cipherlabtest/mainScreen.dart';
@@ -34,7 +36,7 @@ class AuthScreenState extends State<AuthScreen> {
     var index = scannedCode.indexOf('User=');
 
     if (index > -1) {
-      var userGuid = scannedCode.substring(index, 49);
+      var userGuid = scannedCode.substring(index, 41); //49
 
       ApiService.auth(userGuid).then(
         (authInfo) {
@@ -54,28 +56,26 @@ class AuthScreenState extends State<AuthScreen> {
   }
 
   setData(AuthInfo authInfo) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString("user", authInfo.user);
-    prefs.setString("userGuid", authInfo.userGuid);
-    prefs.setString("storage", authInfo.storage);
-    prefs.setString("storageGuid", authInfo.storageGuid);
-    prefs.setString("pin", authInfo.pin);
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('sharedData', jsonEncode(authInfo.toJson()));
   }
 
   loginButtonTapped() {
-    var password = _passwordEditingController.text;
-    SharedPrefData.passwordVerificationPassed(password).then((isAuthorised) {
-      if (isAuthorised) {
-        FocusScope.of(context).requestFocus(FocusNode());
-        saveIsAuthorised();
-        Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute<dynamic>(
-              builder: (BuildContext context) => const MainScreen(),
-            ),
-            (route) => false);
-      }
-    });
+    Navigator.pop(context);
+
+    //var password = _passwordEditingController.text;
+    // SharedPrefData.passwordVerificationPassed(password).then((isAuthorised) {
+    //   if (isAuthorised) {
+    //     FocusScope.of(context).requestFocus(FocusNode());
+    //     saveIsAuthorised();
+    //     Navigator.pushAndRemoveUntil(
+    //         context,
+    //         MaterialPageRoute<dynamic>(
+    //           builder: (BuildContext context) => const MainScreen(),
+    //         ),
+    //         (route) => false);
+    //   }
+    // });
   }
 
   Future<void> saveIsAuthorised() async {
@@ -92,12 +92,26 @@ class AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text("Авторизация"),
+      ),
       body: user.isEmpty
-          ? const Center(
-              child: Text(
-                'Отсканируйте штрихкод авторизации',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Отсканируйте штрихкод авторизации',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+                  ),
+                  ElevatedButton(
+                      onPressed: () {
+                        _onEvent(
+                            "User=5ec715b1-40b1-11e9-bba5-14187764496c"); //Плотников
+                      },
+                      child: const Text('Тестовый вход'))
+                ],
               ),
             )
           : Column(

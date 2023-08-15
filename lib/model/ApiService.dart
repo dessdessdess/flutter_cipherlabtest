@@ -4,6 +4,16 @@ import 'dart:convert';
 
 class ApiService {
   static Future<AuthInfo> auth(String userGuid) async {
+    if (userGuid == 'User=5ec715b1-40b1-11e9-bba5-14187764496c') {
+      return const AuthInfo(
+          result: "Yes",
+          userGuid: "5ec715b1-40b1-11e9-bba5-14187764496c",
+          user: "Плотников Евгений Васильевич",
+          pin: "1111",
+          storageGuid: "c17efa2e-2ea0-11e9-bb9f-14187764496c",
+          storage: "Воронеж РЦ");
+    }
+
     var headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Basic 0J7QsdC80LXQvdCU0J7QmtCe0KDQnzpSamh2bXQyNzU0'
@@ -108,6 +118,14 @@ class AuthInfo {
       storage: json['StorageName'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'userGuid': userGuid,
+        'user': user,
+        'pin': pin,
+        'storageGuid': storageGuid,
+        'storage': storage,
+      };
 }
 
 class InventoryDoc {
