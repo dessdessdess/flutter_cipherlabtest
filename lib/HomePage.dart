@@ -1,14 +1,11 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_cipherlabtest/SettingsPage.dart';
 import 'package:flutter_cipherlabtest/authScreen.dart';
 import 'package:flutter_cipherlabtest/model/Recources.dart';
-import 'package:flutter_cipherlabtest/model/SharedPrefData.dart';
 import 'model/Task.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'model/WorkTask.dart';
 
 class HomePage extends StatefulWidget {
@@ -42,6 +39,8 @@ class _HomePageState extends State<HomePage> {
 
   bool _tasksIsFetching = false;
 
+  String currentWarehouse = '';
+
   @override
   initState() {
     super.initState();
@@ -55,6 +54,7 @@ class _HomePageState extends State<HomePage> {
     final sharedDataString = pref.getString("sharedData") ?? "";
     if (sharedDataString.isNotEmpty) {
       sharedData = SharedData.fromJson(json.decode(sharedDataString));
+      currentWarehouse = sharedData.warehouses[0].name;
     }
   }
 
@@ -178,7 +178,7 @@ class _HomePageState extends State<HomePage> {
                     icon: const Icon(Icons.search));
               }),
             ],
-      bottom: const TabBar(tabs: [
+      bottom: const TabBar(padding: EdgeInsets.all(0), tabs: [
         Tab(
           text: "Задания",
         ),
@@ -250,7 +250,7 @@ class _HomePageState extends State<HomePage> {
                                         'Пожалуйста, авторизуйтесь',
                                         style: TextStyle(fontSize: 24),
                                       ),
-                                      SizedBox(height: 16),
+                                      const SizedBox(height: 16),
                                       OutlinedButton(
                                         child: const Text('ОК'),
                                         onPressed: () => Navigator.pop(context),
@@ -264,9 +264,9 @@ class _HomePageState extends State<HomePage> {
                           fetchTasks();
                         }
                       },
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+                        children: const [
                           Icon(Icons.refresh_outlined),
                           Text('Обновить'),
                         ],
@@ -369,10 +369,15 @@ class _HomePageState extends State<HomePage> {
                                     builder: (context) {
                                       return AuthScreen(sharedData: sharedData);
                                     },
-                                  )).then((value) {
-                                    sharedData = value;
-                                    setState(() {});
-                                  });
+                                  ))
+                                      .then((value) {
+                                        sharedData = value;
+                                        currentWarehouse =
+                                            sharedData.warehouses[0].name;
+                                        setState(() {});
+                                      })
+                                      .catchError((onError) {})
+                                      .onError((error, stackTrace) => null);
                                 },
                                 icon: const Icon(Icons.account_box),
                                 label: const Text("Авторизоваться")),
@@ -384,7 +389,7 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Flexible(
                                   child: Text(
@@ -402,20 +407,38 @@ class _HomePageState extends State<HomePage> {
                                     icon: const Icon(Icons.exit_to_app)),
                               ],
                             ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    sharedData.warehouseName,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ),
-                                IconButton(
-                                    onPressed: () {},
-                                    icon: const Icon(Icons.warehouse))
-                              ],
-                            ),
+                            DropdownButton<String>(
+                                isExpanded: true,
+                                underline: SizedBox(height: 0),
+                                value: currentWarehouse,
+                                items: sharedData.warehouses
+                                    .map((e) => DropdownMenuItem<String>(
+                                          value: e.name,
+                                          child: Text(
+                                            e.name,
+                                            overflow: TextOverflow.clip,
+                                          ),
+                                        ))
+                                    .toList(),
+                                onChanged: (item) {
+                                  setState(() {
+                                    currentWarehouse = item ?? '';
+                                  });
+                                })
+                            // Row(
+                            //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            //   children: [
+                            //     Flexible(
+                            //       child: Text(
+                            //         sharedData.warehouses[0].name,
+                            //         style: const TextStyle(fontSize: 14),
+                            //       ),
+                            //     ),
+                            //     IconButton(
+                            //         onPressed: () {},
+                            //         icon: const Icon(Icons.warehouse))
+                            //   ],
+                            // ),
                           ],
                         ),
                 );
