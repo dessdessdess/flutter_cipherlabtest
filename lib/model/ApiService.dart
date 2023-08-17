@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'AuthInfo.dart';
 
 class ApiService {
-  static Future<AuthInfo> auth(String userGuid) async {
+  static Future<AuthInfo?> auth(String userGuid) async {
     if (userGuid == 'User=5ec715b1-40b1-11e9-bba5-14187764496c') {
-      return const AuthInfo(
-          result: "Yes",
+      return AuthInfo(
+          result: true,
           userGuid: "5ec715b1-40b1-11e9-bba5-14187764496c",
           user: "Плотников Евгений Васильевич",
           pin: "1111",
-          storageGuid: "c17efa2e-2ea0-11e9-bb9f-14187764496c",
-          storage: "Воронеж РЦ");
+          warehouses: [
+            Warehouse(
+                name: 'Воронеж РЦ',
+                guid: 'c17efa2e-2ea0-11e9-bb9f-14187764496c'),
+            Warehouse(
+                name: 'Воронеж РЦ «Транзит»',
+                guid: '55a210a0-2ec7-11e9-bb9f-14187764496c'),
+            Warehouse(
+                name: 'Воронеж РЦ «СпецЗаказ»',
+                guid: '86fe2ee3-2ec7-11e9-bb9f-14187764496c')
+          ]);
     }
 
     var headers = {
@@ -21,7 +31,7 @@ class ApiService {
     var request = http.Request(
         'POST',
         Uri.parse(
-            'http://192.168.11.30/Brinex_abzanov.r/hs/StoragePointV2/Auth'));
+            'http://192.168.11.30/Brinex_abzanov.r/hs/StoragePoint/Auth'));
     request.body = json.encode({"Параметрыавторизации": userGuid});
     request.headers.addAll(headers);
 
@@ -32,15 +42,8 @@ class ApiService {
           jsonDecode(await response.stream.bytesToString()));
     } else {
       debugPrint(response.reasonPhrase);
+      return null;
     }
-
-    return const AuthInfo(
-        result: "result",
-        userGuid: "userGuid",
-        user: "user",
-        pin: "pin",
-        storageGuid: "storageGuid",
-        storage: "storage");
   }
 
   static Future<List<InventoryDoc>> getTasksInProgress(int index) async {
@@ -89,43 +92,6 @@ class ApiService {
           goods: [])
     ];
   }
-}
-
-class AuthInfo {
-  final String result;
-  final String userGuid;
-  final String user;
-  final String pin;
-  final String storageGuid;
-  final String storage;
-
-  const AuthInfo({
-    required this.result,
-    required this.userGuid,
-    required this.user,
-    required this.pin,
-    required this.storageGuid,
-    required this.storage,
-  });
-
-  factory AuthInfo.fromJson(Map<String, dynamic> json) {
-    return AuthInfo(
-      result: json['Result'],
-      userGuid: json['USERGUID'],
-      user: json['User'],
-      pin: json['PIN'],
-      storageGuid: json['Storage'],
-      storage: json['StorageName'],
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'userGuid': userGuid,
-        'user': user,
-        'pin': pin,
-        'storageGuid': storageGuid,
-        'storage': storage,
-      };
 }
 
 class InventoryDoc {

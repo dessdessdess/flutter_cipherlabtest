@@ -1,3 +1,5 @@
+import 'package:flutter_cipherlabtest/model/AuthInfo.dart';
+
 class Recources {
   static final sections = [
     "Приемка",
@@ -17,32 +19,32 @@ class Recources {
 
 class SharedData {
   String userName;
-  String warehouseName;
+  List<Warehouse> warehouses;
   String userGuid;
-  String warehouseGuid;
+
   String pin;
 
   SharedData({
     required this.userName,
-    required this.warehouseName,
+    required this.warehouses,
     required this.userGuid,
-    required this.warehouseGuid,
     required this.pin,
   });
 
-  static final shared = SharedData(
-      userName: '',
-      warehouseName: '',
-      userGuid: '',
-      warehouseGuid: '',
-      pin: '');
+  static final shared =
+      SharedData(userName: '', warehouses: [], userGuid: '', pin: '');
 
   factory SharedData.fromJson(Map<String, dynamic> json) {
+    List<dynamic> dss = json['warehouses'];
+    List<Warehouse> warehouses = List<Warehouse>.from(dss.map((element) {
+      final Map<String, dynamic> el = element;
+      return Warehouse.fromJson(el);
+    }));
+
     return SharedData(
         userName: json['user'],
-        warehouseName: json['storage'],
+        warehouses: warehouses,
         userGuid: json['userGuid'],
-        warehouseGuid: json['storageGuid'],
         pin: json['pin']);
   }
 }

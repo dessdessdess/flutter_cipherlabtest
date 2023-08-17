@@ -1,12 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_cipherlabtest/mainScreen.dart';
 import 'package:flutter_cipherlabtest/model/ApiService.dart';
-import 'package:flutter_cipherlabtest/model/SharedPrefData.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'model/AuthInfo.dart';
 import 'model/Recources.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -25,8 +24,9 @@ class AuthScreenState extends State<AuthScreen> {
 
   late SharedData sharedData;
 
-  String _user = '';
+  String user = '';
   bool _passwordCorrect = true;
+  String errorMessage = '';
 
   final TextEditingController _passwordEditingController =
       TextEditingController();
@@ -53,6 +53,9 @@ class AuthScreenState extends State<AuthScreen> {
   }
 
   void _onEvent(Object? event) {
+    // _user = '';
+    // _errorMessage = '';
+
     var scannedCode = "$event";
     var index = scannedCode.indexOf('User=');
 
@@ -61,10 +64,18 @@ class AuthScreenState extends State<AuthScreen> {
 
       ApiService.auth(userGuid).then(
         (authInfo) {
-          setData(authInfo);
-          setState(() {
-            _user = authInfo.user;
-          });
+          if (authInfo != null) {
+            if (authInfo.result) {
+              setData(authInfo);
+              user = authInfo.user;
+            } else {
+              errorMessage = '${authInfo.user} не назначена роль Кладовщик';
+            }
+          } else {
+            errorMessage = 'Что-то пошло не так...';
+          }
+
+          setState(() {});
         },
       );
     }
@@ -72,7 +83,7 @@ class AuthScreenState extends State<AuthScreen> {
 
   void _onError(Object error) {
     setState(() {
-      _user = '';
+      user = '';
     });
   }
 
@@ -106,73 +117,96 @@ class AuthScreenState extends State<AuthScreen> {
       appBar: AppBar(
         title: const Text("Авторизация"),
       ),
-      body: _user.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Отсканируйте штрихкод авторизации',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+      body: user.isEmpty
+          ? errorMessage.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Отсканируйте штрихкод авторизации',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 24),
+                      ),
+                      ElevatedButton(
+                          onPressed: () {
+                            _onEvent(
+                                "User=5ec715b1-40b1-11e9-bba5-14187764496c"); //Плотников
+                          },
+                          child: const Text('Тестовый вход'))
+                    ],
                   ),
-                  ElevatedButton(
-                      onPressed: () {
-                        _onEvent(
-                            "User=5ec715b1-40b1-11e9-bba5-14187764496c"); //Плотников
-                      },
-                      child: const Text('Тестовый вход'))
-                ],
-              ),
-            )
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16),
-                  child: Text(
-                    _user,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 24),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  child: TextField(
-                    controller: _passwordEditingController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Пароль',
+                )
+              : BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                  child: AlertDialog(
+                    title: const Text('Внимание'),
+                    content: Text(errorMessage),
+                    actions: [
+                      ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              errorMessage = '';
+                            });
+                          },
+                          child: const Text('OK'))
+                    ],
+                  ))
+          : Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 16),
+                      child: Text(
+                        user,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 24),
+                      ),
                     ),
-                  ),
-                ),
-                _passwordCorrect
-                    ? const SizedBox(
-                        height: 0,
-                      )
-                    : const Padding(
-                        padding:
-                            EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                        child: Text(
-                          'Неправильный пароль!',
-                          style: TextStyle(color: Colors.red),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      child: TextField(
+                        controller: _passwordEditingController,
+                        obscureText: true,
+                        style: const TextStyle(fontSize: 18),
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          labelText: 'Пароль',
                         ),
                       ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16),
-                  child: ElevatedButton(
-                      onPressed: loginButtonTapped,
-                      child: const Padding(
-                        padding: EdgeInsets.all(12.0),
-                        child: Text(
-                          'Войти',
-                          style: TextStyle(fontSize: 24),
-                        ),
-                      )),
+                    ),
+                    _passwordCorrect
+                        ? const SizedBox(
+                            height: 0,
+                          )
+                        : const Padding(
+                            padding: EdgeInsets.only(
+                                left: 16, right: 16, bottom: 16),
+                            child: Text(
+                              'Неправильный пароль!',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          left: 16, right: 16, bottom: 32),
+                      child: ElevatedButton(
+                          onPressed: loginButtonTapped,
+                          child: const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: Text(
+                              'Войти',
+                              style: TextStyle(fontSize: 24),
+                            ),
+                          )),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
     );
   }
