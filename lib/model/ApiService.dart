@@ -5,24 +5,24 @@ import 'AuthInfo.dart';
 
 class ApiService {
   static Future<AuthInfo?> auth(String userGuid) async {
-    if (userGuid == 'User=5ec715b1-40b1-11e9-bba5-14187764496c') {
-      return AuthInfo(
-          result: true,
-          userGuid: "5ec715b1-40b1-11e9-bba5-14187764496c",
-          user: "Плотников Евгений Васильевич",
-          pin: "1111",
-          warehouses: [
-            Warehouse(
-                name: 'Воронеж РЦ',
-                guid: 'c17efa2e-2ea0-11e9-bb9f-14187764496c'),
-            Warehouse(
-                name: 'Воронеж РЦ «Транзит»',
-                guid: '55a210a0-2ec7-11e9-bb9f-14187764496c'),
-            Warehouse(
-                name: 'Воронеж РЦ «СпецЗаказ»',
-                guid: '86fe2ee3-2ec7-11e9-bb9f-14187764496c')
-          ]);
-    }
+    // if (userGuid == 'User=5ec715b1-40b1-11e9-bba5-14187764496c') {
+    //   return AuthInfo(
+    //       result: true,
+    //       userGuid: "5ec715b1-40b1-11e9-bba5-14187764496c",
+    //       user: "Плотников Евгений Васильевич",
+    //       pin: "1111",
+    //       warehouses: [
+    //         Warehouse(
+    //             name: 'Воронеж РЦ',
+    //             guid: 'c17efa2e-2ea0-11e9-bb9f-14187764496c'),
+    //         Warehouse(
+    //             name: 'Воронеж РЦ «Транзит»',
+    //             guid: '55a210a0-2ec7-11e9-bb9f-14187764496c'),
+    //         Warehouse(
+    //             name: 'Воронеж РЦ «СпецЗаказ»',
+    //             guid: '86fe2ee3-2ec7-11e9-bb9f-14187764496c')
+    //       ]);
+    // }
 
     var headers = {
       'Content-Type': 'application/json',
