@@ -40,6 +40,7 @@ class _HomePageState extends State<HomePage> {
   bool _tasksIsFetching = false;
 
   String currentWarehouse = '';
+  DateTime currentDate = DateTime.now();
 
   @override
   initState() {
@@ -56,6 +57,13 @@ class _HomePageState extends State<HomePage> {
       sharedData = SharedData.fromJson(json.decode(sharedDataString));
       currentWarehouse = sharedData.warehouses[0].name;
     }
+
+    final currentDateInt = pref.getInt("currentDate") ?? 0;
+    if (currentDateInt != 0) {
+      currentDate = DateTime.fromMillisecondsSinceEpoch(currentDateInt);
+    }
+
+    setState(() {});
   }
 
   clearSharedData() async {
@@ -66,6 +74,15 @@ class _HomePageState extends State<HomePage> {
       listOfWorkTasks.clear();
       setState(() {});
     });
+  }
+
+  void saveCurrentDate(DateTime? value) async {
+    if (value != null) {
+      currentDate = value;
+      final pref = await SharedPreferences.getInstance();
+      pref.setInt('currentDate', currentDate.millisecondsSinceEpoch);
+      setState(() {});
+    }
   }
 
   searchQueryChanged() {
@@ -152,8 +169,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                   maxLines: 2,
                 ),
-                const Text(
-                  '15/08/2023',
+                Text(
+                  DateFormat('dd.MM.yyyy').format(currentDate),
                   style: TextStyle(fontSize: 10),
                 ),
               ],
@@ -165,8 +182,18 @@ class _HomePageState extends State<HomePage> {
               )
             ]
           : [
-              IconButton(
-                  onPressed: () {}, icon: const Icon(Icons.calendar_month)),
+              Builder(builder: (context) {
+                return IconButton(
+                    onPressed: () {
+                      showDatePicker(
+                              context: context,
+                              firstDate: DateTime(2023),
+                              initialDate: currentDate,
+                              lastDate: DateTime(2030))
+                          .then((value) => saveCurrentDate(value));
+                    },
+                    icon: const Icon(Icons.calendar_month));
+              }),
               Builder(builder: (context) {
                 return IconButton(
                     onPressed: () {
