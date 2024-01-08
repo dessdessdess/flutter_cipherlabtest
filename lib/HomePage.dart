@@ -546,8 +546,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                     currentWarehouse = item ?? '';
                                     currentWarehouseGUID = sharedData.warehouses
                                         .firstWhere((element) =>
-                                            element.name ==
-                                            currentWarehouse) as String;
+                                            element.name == currentWarehouse)
+                                        .guid;
                                   });
                                 })
                             // Row(
