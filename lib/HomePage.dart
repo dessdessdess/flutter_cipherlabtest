@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_cipherlabtest/DetailWorkTaskPage.dart';
 import 'package:flutter_cipherlabtest/SettingsPage.dart';
 import 'package:flutter_cipherlabtest/authScreen.dart';
+import 'package:flutter_cipherlabtest/model/ApiService.dart';
 import 'package:flutter_cipherlabtest/model/Recources.dart';
 import 'model/Task.dart';
 import 'package:intl/intl.dart';
@@ -15,7 +17,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   var sharedData = SharedData.shared;
 
   var listForDrawer = [];
@@ -34,12 +36,15 @@ class _HomePageState extends State<HomePage> {
   int countOfSelectedTasks = 0;
 
   final searchController = TextEditingController();
+  //final focusNode = FocusNode();
 
   var currentTabIndex = 0;
 
   bool _tasksIsFetching = false;
+  bool _workTasksIsFetching = false;
 
   String currentWarehouse = '';
+  String currentWarehouseGUID = '';
   DateTime currentDate = DateTime.now();
 
   @override
@@ -56,12 +61,13 @@ class _HomePageState extends State<HomePage> {
     if (sharedDataString.isNotEmpty) {
       sharedData = SharedData.fromJson(json.decode(sharedDataString));
       currentWarehouse = sharedData.warehouses[0].name;
+      currentWarehouseGUID = sharedData.warehouses[0].guid;
     }
 
-    final currentDateInt = pref.getInt("currentDate") ?? 0;
-    if (currentDateInt != 0) {
-      currentDate = DateTime.fromMillisecondsSinceEpoch(currentDateInt);
-    }
+    // final currentDateInt = pref.getInt("currentDate") ?? 0;
+    // if (currentDateInt != 0) {
+    //   currentDate = DateTime.fromMillisecondsSinceEpoch(currentDateInt);
+    // }
 
     setState(() {});
   }
@@ -76,14 +82,14 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void saveCurrentDate(DateTime? value) async {
-    if (value != null) {
-      currentDate = value;
-      final pref = await SharedPreferences.getInstance();
-      pref.setInt('currentDate', currentDate.millisecondsSinceEpoch);
-      setState(() {});
-    }
-  }
+  // void saveCurrentDate(DateTime? value) async {
+  //   if (value != null) {
+  //     currentDate = value;
+  //     final pref = await SharedPreferences.getInstance();
+  //     pref.setInt('currentDate', currentDate.millisecondsSinceEpoch);
+  //     setState(() {});
+  //   }
+  // }
 
   searchQueryChanged() {
     final searchQuery = searchController.text.toLowerCase();
@@ -109,24 +115,101 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
+  void clearListOfTasks() {
+    listOfTasks.clear();
+    filteredListOfTasks.clear();
+    listOfWorkTasks.clear();
+    filteredListOfWorkTasks.clear();
+  }
+
+  void showCustomError(BuildContext context, String text) {
+    showModalBottomSheet(
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        context: context,
+        builder: (context) => Center(
+                child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  text,
+                  style: const TextStyle(fontSize: 24),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  child: const Text('ОК'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            )));
+  }
+
+  tabIndexChanged(TabController tabController) {
+    //if (tabController.indexIsChanging) {
+    if (searchFieldIsOpened) {
+      searchFieldIsOpened = false;
+      searchController.text = '';
+    }
+    currentTabIndex = tabController.index;
+    setState(() {});
+    // }
+  }
+
+  Future<void> fetchTasks() async {
+    // print(currentSection);
+    // await Future<void>.delayed(const Duration(seconds: 1));
+
+    countOfSelectedTasks = 0;
+    ApiService.getTasks(currentSection, sharedData.userGuid,
+            currentWarehouseGUID, currentDate)
+        .then((value) {
+      listOfTasks = value;
+      filteredListOfTasks = listOfTasks;
+      _tasksIsFetching = false;
+      setState(() {});
+    });
+  }
+
+  Future<void> fetchWorkTasks() async {
+    // print(currentSection);
+    // await Future<void>.delayed(const Duration(seconds: 1));
+
+    ApiService.getWorkTasks(currentSection, sharedData.userGuid,
+            currentWarehouseGUID, currentDate)
+        .then((value) {
+      listOfWorkTasks = value;
+      filteredListOfWorkTasks = listOfWorkTasks;
+      _workTasksIsFetching = false;
+      setState(() {});
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-          appBar: kdAppBar(),
-          body: TabBarView(children: [kdTasks(), kdWorkTasks()]),
-          onDrawerChanged: (isOpened) {
-            if (listForDrawer.isEmpty) {
-              listForDrawer.add("Drawer header");
-              Recources.sections.forEach((element) {
-                listForDrawer.add(element);
-              });
-              listForDrawer.add("Настройки");
-              setState(() {});
-            }
-          },
-          drawer: kdDrawer()),
+      child: Builder(builder: (context) {
+        final tabController = DefaultTabController.of(context);
+
+        tabController.addListener(() => tabIndexChanged(tabController));
+
+        return Scaffold(
+            appBar: kdAppBar(),
+            body: TabBarView(
+                controller: tabController,
+                children: [kdTasks(), kdWorkTasks()]),
+            onDrawerChanged: (isOpened) {
+              if (listForDrawer.isEmpty) {
+                listForDrawer.add("Drawer header");
+                Recources.sections.forEach((element) {
+                  listForDrawer.add(element);
+                });
+                listForDrawer.add("Настройки");
+                setState(() {});
+              }
+            },
+            drawer: kdDrawer());
+      }),
     );
   }
 
@@ -171,12 +254,12 @@ class _HomePageState extends State<HomePage> {
                 ),
                 Text(
                   DateFormat('dd.MM.yyyy').format(currentDate),
-                  style: TextStyle(fontSize: 10),
+                  style: const TextStyle(fontSize: 10),
                 ),
               ],
             ),
       actions: searchFieldIsOpened
-          ? [
+          ? <Widget>[
               const SizedBox(
                 width: 0,
               )
@@ -186,18 +269,26 @@ class _HomePageState extends State<HomePage> {
                 return IconButton(
                     onPressed: () {
                       showDatePicker(
-                              context: context,
-                              firstDate: DateTime(2023),
-                              initialDate: currentDate,
-                              lastDate: DateTime(2030))
-                          .then((value) => saveCurrentDate(value));
+                        context: context,
+                        firstDate: DateTime(2023),
+                        initialDate: currentDate,
+                        lastDate: DateTime(2030),
+                      ).then((value) {
+                        if (value != null) {
+                          currentDate = value;
+                          clearListOfTasks();
+                          fetchTasks();
+                          fetchWorkTasks();
+                          setState(() {});
+                        }
+                      });
                     },
                     icon: const Icon(Icons.calendar_month));
               }),
               Builder(builder: (context) {
                 return IconButton(
                     onPressed: () {
-                      currentTabIndex = DefaultTabController.of(context).index;
+                      //currentTabIndex = DefaultTabController.of(context).index;
                       setState(() {
                         searchFieldIsOpened = true;
                       });
@@ -218,36 +309,62 @@ class _HomePageState extends State<HomePage> {
 
   Center kdWorkTasks() {
     return Center(
-      child: RefreshIndicator(
-        onRefresh: () async {
-          await Future<void>.delayed(const Duration(seconds: 1));
-
-          setState(() {
-            listOfWorkTasks = WorkTask.getExampleWorkTasks();
-            filteredListOfWorkTasks = listOfWorkTasks;
-          });
-        },
-        child: ListView.separated(
-            itemCount: filteredListOfWorkTasks.length,
-            separatorBuilder: (context, index) {
-              return const Divider(
-                height: 1,
-              );
-            },
-            itemBuilder: (context, index) {
-              final workTask = filteredListOfWorkTasks[index];
-              return ListTile(
-                onTap: () {},
-                title: Text(workTask.docType),
-                subtitle: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(workTask.number),
-                      Text(DateFormat('dd.MM.yyyy').format(workTask.date))
-                    ]),
-              );
-            }),
-      ),
+      child: listOfWorkTasks.isEmpty
+          ? Builder(builder: (context) {
+              return _workTasksIsFetching
+                  ? Image.asset(
+                      'assets/images/loading.gif',
+                      height: 50,
+                      width: 50,
+                    )
+                  : OutlinedButton(
+                      onPressed: () {
+                        if (sharedData.userName.isEmpty) {
+                          showCustomError(
+                              context, 'Пожалуйста, авторизуйтесь!');
+                        } else {
+                          setState(() {
+                            _workTasksIsFetching = true;
+                          });
+                          fetchWorkTasks();
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.refresh_outlined),
+                          Text('Обновить'),
+                        ],
+                      ));
+            })
+          : RefreshIndicator(
+              onRefresh: fetchWorkTasks,
+              child: ListView.separated(
+                  itemCount: filteredListOfWorkTasks.length,
+                  separatorBuilder: (context, index) {
+                    return const Divider(
+                      height: 1,
+                    );
+                  },
+                  itemBuilder: (context, index) {
+                    final workTask = filteredListOfWorkTasks[index];
+                    return ListTile(
+                      onTap: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) {
+                          return DetailWorkTaskPage(workTask: workTask);
+                        }));
+                      },
+                      title: Text(workTask.docType),
+                      subtitle: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(workTask.number),
+                            Text(DateFormat('dd.MM.yyyy').format(workTask.date))
+                          ]),
+                    );
+                  }),
+            ),
     );
   }
 
@@ -264,26 +381,8 @@ class _HomePageState extends State<HomePage> {
                   : OutlinedButton(
                       onPressed: () {
                         if (sharedData.userName.isEmpty) {
-                          showModalBottomSheet(
-                              shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(20))),
-                              context: context,
-                              builder: (context) => Center(
-                                      child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        'Пожалуйста, авторизуйтесь',
-                                        style: TextStyle(fontSize: 24),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      OutlinedButton(
-                                        child: const Text('ОК'),
-                                        onPressed: () => Navigator.pop(context),
-                                      ),
-                                    ],
-                                  )));
+                          showCustomError(
+                              context, 'Пожалуйста, авторизуйтесь!');
                         } else {
                           setState(() {
                             _tasksIsFetching = true;
@@ -310,43 +409,45 @@ class _HomePageState extends State<HomePage> {
                               height: 1,
                             ),
                         itemBuilder: ((context, index) {
-                          final task = filteredListOfTasks[index];
+                          if (filteredListOfTasks.length > index) {
+                            final task = filteredListOfTasks[index];
 
-                          return Padding(
-                            padding: EdgeInsets.zero,
-                            child: ListTile(
-                              leading: task.selected
-                                  ? const Icon(
-                                      Icons.check_box,
-                                      color: Colors.blue,
-                                    )
-                                  : const Icon(
-                                      Icons.check_box_outline_blank,
-                                    ),
-                              title: Padding(
-                                padding: EdgeInsets.zero,
-                                child: Text(task.docType),
+                            return Padding(
+                              padding: EdgeInsets.zero,
+                              child: ListTile(
+                                leading: task.selected
+                                    ? const Icon(
+                                        Icons.check_box,
+                                        color: Colors.blue,
+                                      )
+                                    : const Icon(
+                                        Icons.check_box_outline_blank,
+                                      ),
+                                title: Padding(
+                                  padding: EdgeInsets.zero,
+                                  child: Text(task.docType),
+                                ),
+                                subtitle: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Flexible(child: Text(task.number)),
+                                      Text(DateFormat('dd.MM.yyyy')
+                                          .format(task.date))
+                                    ]),
+                                onTap: () {
+                                  setState(() {
+                                    task.selected = !task.selected;
+
+                                    countOfSelectedTasks = listOfTasks
+                                        .where((element) =>
+                                            element.selected == true)
+                                        .length;
+                                  });
+                                },
                               ),
-                              subtitle: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Flexible(child: Text(task.number)),
-                                    Text(DateFormat('dd.MM.yyyy')
-                                        .format(task.date))
-                                  ]),
-                              onTap: () {
-                                setState(() {
-                                  task.selected = !task.selected;
-
-                                  countOfSelectedTasks = listOfTasks
-                                      .where(
-                                          (element) => element.selected == true)
-                                      .length;
-                                });
-                              },
-                            ),
-                          );
+                            );
+                          }
                         })),
                   ),
                   Padding(
@@ -364,16 +465,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
     );
-  }
-
-  Future<void> fetchTasks() async {
-    await Future<void>.delayed(const Duration(seconds: 1));
-    setState(() {
-      countOfSelectedTasks = 0;
-      listOfTasks = Task.getExampleTasks();
-      filteredListOfTasks = listOfTasks;
-      _tasksIsFetching = false;
-    });
   }
 
   Drawer kdDrawer() {
@@ -401,6 +492,8 @@ class _HomePageState extends State<HomePage> {
                                         sharedData = value;
                                         currentWarehouse =
                                             sharedData.warehouses[0].name;
+                                        currentWarehouseGUID =
+                                            sharedData.warehouses[0].guid;
                                         setState(() {});
                                       })
                                       .catchError((onError) {})
@@ -436,7 +529,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             DropdownButton<String>(
                                 isExpanded: true,
-                                underline: SizedBox(height: 0),
+                                underline: const SizedBox(height: 0),
                                 value: currentWarehouse,
                                 items: sharedData.warehouses
                                     .map((e) => DropdownMenuItem<String>(
@@ -449,7 +542,12 @@ class _HomePageState extends State<HomePage> {
                                     .toList(),
                                 onChanged: (item) {
                                   setState(() {
+                                    clearListOfTasks();
                                     currentWarehouse = item ?? '';
+                                    currentWarehouseGUID = sharedData.warehouses
+                                        .firstWhere((element) =>
+                                            element.name ==
+                                            currentWarehouse) as String;
                                   });
                                 })
                             // Row(
@@ -483,9 +581,12 @@ class _HomePageState extends State<HomePage> {
                         Navigator.pop(context);
 
                         currentSection = index - 1;
-                        listOfTasks.clear();
-                        listOfWorkTasks.clear();
+                        clearListOfTasks();
                         countOfSelectedTasks = 0;
+
+                        final tabController = DefaultTabController.of(context);
+                        tabController.index = 0;
+                        tabIndexChanged(tabController);
 
                         if (currentSection < Recources.sections.length) {
                           titleText =

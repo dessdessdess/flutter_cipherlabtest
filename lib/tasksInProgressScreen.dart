@@ -34,11 +34,11 @@ class _TasksInProgressScreenState extends State<TasksInProgressScreen> {
         backgroundColor: Colors.blue,
         onRefresh: () async {
           await Future<void>.delayed(const Duration(seconds: 3));
-          ApiService.getTasksInProgress(index).then((tasksFromApi) => {
-                setState(() {
-                  tasks = tasksFromApi;
-                })
-              });
+          // ApiService.getWorkTasks(index).then((tasksFromApi) => {
+          //       setState(() {
+          //         //tasks = tasksFromApi;
+          //       })
+          //     });
         },
         child: ListView.builder(
             itemCount: tasks.length,

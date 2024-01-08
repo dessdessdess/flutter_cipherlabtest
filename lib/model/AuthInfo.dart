@@ -17,8 +17,8 @@ class AuthInfo {
     List<dynamic> dss = json['Склады'];
 
     List<Warehouse> warehouses = List<Warehouse>.from(dss.map((element) {
-      final Map<String, dynamic> el = element;
-      return Warehouse.fromJson(el);
+      //final Map<String, dynamic> el = element;
+      return Warehouse.fromJson(element as Map<String, dynamic>);
     }));
 
     return AuthInfo(
