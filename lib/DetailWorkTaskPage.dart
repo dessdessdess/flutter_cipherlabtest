@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_cipherlabtest/model/DBService.dart';
 import 'package:flutter_cipherlabtest/model/WorkTask.dart';
 import 'package:intl/intl.dart';
 
@@ -15,13 +17,68 @@ class DetailWorkTaskPage extends StatefulWidget {
 }
 
 class _DetailWorkTaskPageState extends State<DetailWorkTaskPage> {
+  static const eventChannel = EventChannel('samples.flutter.dev/getscancode');
+
   late WorkTask workTask;
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     workTask = widget.workTask;
+    scanEventHandle();
+  }
+
+  Future<void> scanEventHandle() async {
+    try {
+      eventChannel.receiveBroadcastStream().listen(_onEvent, onError: _onError);
+    } on PlatformException catch (e) {
+      debugPrint("Failed to Invoke: '${e.message}'.");
+    }
+  }
+
+  void _onEvent(Object? event) {
+    for (var element in workTask.gtins) {
+      debugPrint(element.gtin);
+    }
+    var scannedCode = "$event";
+
+    if (scannedCode.startsWith('01')) {
+      final gtin = scannedCode.substring(2, 16);
+
+      final findedGTIN = workTask.gtins.firstWhere(
+          (element) => element.gtin == gtin,
+          orElse: () =>
+              GTIN(nomenclatureGuid: '', characteristicGuid: '', gtin: ''));
+
+      if (findedGTIN.nomenclatureGuid.isNotEmpty) {
+        var currentGood = workTask.goods.firstWhere((element) =>
+            element.nomenclatureGuid == findedGTIN.nomenclatureGuid &&
+            element.characteristicGuid == findedGTIN.characteristicGuid);
+
+        if (currentGood.currentQuantity < currentGood.quantity &&
+            !workTask.marks.contains(scannedCode)) {
+          workTask.marks.add(scannedCode);
+          currentGood.currentQuantity++;
+          if (currentGood.currentQuantity == currentGood.quantity) {
+            currentGood.completed = true;
+
+            var completed = true;
+            for (var element in workTask.goods) {
+              if (element.currentQuantity < element.quantity) {
+                completed = false;
+              }
+            }
+
+            workTask.completed = completed;
+          }
+          setState(() {});
+        }
+      }
+    }
+  }
+
+  void _onError(Object error) {
+    debugPrint(error.toString());
   }
 
   @override
@@ -42,10 +99,10 @@ class _DetailWorkTaskPageState extends State<DetailWorkTaskPage> {
                 children: [
                   Text(
                     workTask.number,
-                    style: const TextStyle(fontSize: 24),
+                    style: const TextStyle(fontSize: 16),
                   ),
                   Text(DateFormat('dd.MM.yyyy').format(workTask.date),
-                      style: const TextStyle(fontSize: 24)),
+                      style: const TextStyle(fontSize: 16)),
                 ],
               ),
               Row(
@@ -75,7 +132,7 @@ class _DetailWorkTaskPageState extends State<DetailWorkTaskPage> {
               Expanded(
                 child: ListView.separated(
                   itemCount: workTask.goods.length,
-                  separatorBuilder: (context, int) {
+                  separatorBuilder: (context, index) {
                     return const Divider(
                       height: 1,
                     );
@@ -85,46 +142,71 @@ class _DetailWorkTaskPageState extends State<DetailWorkTaskPage> {
 
                     const style = TextStyle(fontSize: 20);
 
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                good.nomenclature,
-                                style: style,
-                              ),
-                              good.characteristic.isEmpty
-                                  ? const SizedBox(
-                                      height: 0,
-                                    )
-                                  : Text(good.characteristic),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          children: [
-                            Row(
+                    return GestureDetector(
+                      onTap: () {
+                        if (good.completed) {
+                          return;
+                        }
+
+                        good.currentQuantity++;
+                        if (good.currentQuantity == good.quantity) {
+                          good.completed = true;
+                        }
+
+                        var completed = true;
+                        for (var element in workTask.goods) {
+                          if (element.currentQuantity < element.quantity) {
+                            completed = false;
+                          }
+                        }
+
+                        workTask.completed = completed;
+
+                        DBService.db.updateWorktask(workTask);
+
+                        setState(() {});
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  good.currentQuantity.toString(),
+                                  good.nomenclature,
                                   style: style,
                                 ),
-                                const Text(
-                                  ' / ',
-                                  style: style,
-                                ),
-                                Text(
-                                  good.quantity.toString(),
-                                  style: style,
-                                ),
+                                good.characteristic.isEmpty
+                                    ? const SizedBox(
+                                        height: 0,
+                                      )
+                                    : Text(good.characteristic),
                               ],
-                            )
-                          ],
-                        )
-                      ],
+                            ),
+                          ),
+                          Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    good.currentQuantity.toString(),
+                                    style: style,
+                                  ),
+                                  const Text(
+                                    ' / ',
+                                    style: style,
+                                  ),
+                                  Text(
+                                    good.quantity.toString(),
+                                    style: style,
+                                  ),
+                                ],
+                              )
+                            ],
+                          )
+                        ],
+                      ),
                     );
                   },
                 ),

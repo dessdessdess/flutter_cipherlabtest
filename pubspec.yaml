@@ -12,7 +12,9 @@ dependencies:
   flutter_native_splash: ^2.2.19
   http: ^0.13.5
   intl: ^0.18.1
+  path: ^1.8.2
   shared_preferences: ^2.2.0
+  sqflite: ^2.2.8+4
 
 dev_dependencies:
   flutter_test:

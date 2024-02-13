@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_cipherlabtest/DetailWorkTaskPage.dart';
+import 'package:flutter_cipherlabtest/detailWorkTaskPage.dart';
 import 'package:flutter_cipherlabtest/SettingsPage.dart';
 import 'package:flutter_cipherlabtest/authScreen.dart';
 import 'package:flutter_cipherlabtest/model/ApiService.dart';
+import 'package:flutter_cipherlabtest/model/DBService.dart';
 import 'package:flutter_cipherlabtest/model/Recources.dart';
 import 'model/Task.dart';
 import 'package:intl/intl.dart';
@@ -17,7 +18,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   var sharedData = SharedData.shared;
 
   var listForDrawer = [];
@@ -39,20 +41,35 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   //final focusNode = FocusNode();
 
   var currentTabIndex = 0;
+  var completedTasksCount = 0;
 
   bool _tasksIsFetching = false;
   bool _workTasksIsFetching = false;
 
   String currentWarehouse = '';
   String currentWarehouseGUID = '';
-  DateTime currentDate = DateTime.now();
+
+  late DateTime currentDate;
+
+  late TabController _tabController;
 
   @override
   initState() {
     super.initState();
+
+    final now = DateTime.now();
+    currentDate = DateTime(now.year, now.month, now.day);
+
     searchController.addListener(searchQueryChanged);
+    _tabController = TabController(vsync: this, length: 2);
 
     loadSharedData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   loadSharedData() async {
@@ -69,7 +86,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     //   currentDate = DateTime.fromMillisecondsSinceEpoch(currentDateInt);
     // }
 
-    setState(() {});
+    DBService.db.countOfCompletedTasks().then((value) {
+      completedTasksCount = value;
+      setState(() {});
+    });
   }
 
   clearSharedData() async {
@@ -115,14 +135,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     setState(() {});
   }
 
-  void clearListOfTasks() {
+  void _clearListOfTasks() {
     listOfTasks.clear();
     filteredListOfTasks.clear();
     listOfWorkTasks.clear();
     filteredListOfWorkTasks.clear();
   }
 
-  void showCustomError(BuildContext context, String text) {
+  void _showCustomError(BuildContext context, String text) {
     showModalBottomSheet(
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -148,17 +168,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     //if (tabController.indexIsChanging) {
     if (searchFieldIsOpened) {
       searchFieldIsOpened = false;
-      searchController.text = '';
+      searchController.clear();
     }
     currentTabIndex = tabController.index;
     setState(() {});
     // }
   }
 
-  Future<void> fetchTasks() async {
-    // print(currentSection);
-    // await Future<void>.delayed(const Duration(seconds: 1));
-
+  Future<void> _fetchTasks() async {
     countOfSelectedTasks = 0;
     ApiService.getTasks(currentSection, sharedData.userGuid,
             currentWarehouseGUID, currentDate)
@@ -170,17 +187,97 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
   }
 
-  Future<void> fetchWorkTasks() async {
-    // print(currentSection);
-    // await Future<void>.delayed(const Duration(seconds: 1));
-
+  Future<void> _fetchWorkTasks() async {
     ApiService.getWorkTasks(currentSection, sharedData.userGuid,
             currentWarehouseGUID, currentDate)
+        .then((value) async {
+      for (var element in value) {
+        await DBService.db.insertWorkTask(element);
+      }
+
+      DBService.db.workTasks(currentDate).then((value) {
+        listOfWorkTasks = value;
+        filteredListOfWorkTasks = listOfWorkTasks;
+
+        _workTasksIsFetching = false;
+        setState(() {});
+      });
+    });
+  }
+
+  _sendAcceptedTasks() {
+    var acceptedTasks =
+        listOfTasks.where((element) => element.selected == true).toList();
+    ApiService.sendAcceptedTasks(
+            currentSection, sharedData.userGuid, acceptedTasks)
+        .then((acceptedTasksByOtherUser) {
+      if (acceptedTasksByOtherUser.isNotEmpty) {
+        var message = '';
+        for (var element in acceptedTasksByOtherUser) {
+          message =
+              "$message\nЗадание ${element.number} уже взято в работу пользователем ${element.user}";
+        }
+        _showCustomError(context, message);
+        _fetchTasks();
+      } else {
+        _tabController.index = 1;
+        _workTasksIsFetching = true;
+        setState(() {});
+        _fetchWorkTasks();
+        _fetchTasks();
+      }
+    });
+  }
+
+  _sendCompletedTasks() {
+    DBService.db.completedTasks().then((completedTasks) {
+      if (completedTasks.isNotEmpty) {
+        _workTasksIsFetching = true;
+        setState(() {});
+
+        ApiService.sendCompletedTasks(completedTasks).then((value) {
+          if (value) {
+            DBService.db.deleteTasks(completedTasks).then((value) {
+              if (value) {
+                DBService.db.countOfCompletedTasks().then((value) {
+                  _showCustomError(context, 'Успешно!');
+                  completedTasksCount = value;
+                  _fetchWorkTasks();
+                });
+              }
+            });
+          } else {
+            _showCustomError(context, 'Ошибка!');
+          }
+        });
+      }
+    });
+  }
+
+  _sendCancelledTasks(int? value, WorkTask workTask) {
+    if (value == null) {
+      return;
+    }
+
+    _workTasksIsFetching = true;
+    setState(() {});
+
+    ApiService.sendCancelledTasks(
+            sharedData.userGuid, workTask.guid, workTask.docTypeInternal)
         .then((value) {
-      listOfWorkTasks = value;
-      filteredListOfWorkTasks = listOfWorkTasks;
-      _workTasksIsFetching = false;
-      setState(() {});
+      if (value) {
+        DBService.db.deleteTask(workTask.guid).then((value) {
+          if (value) {
+            DBService.db.countOfCompletedTasks().then((value) {
+              _showCustomError(context, 'Успешно!');
+              completedTasksCount = value;
+              _fetchWorkTasks();
+            });
+          }
+        });
+      } else {
+        _showCustomError(context, 'Ошибка!');
+      }
     });
   }
 
@@ -189,21 +286,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return DefaultTabController(
       length: 2,
       child: Builder(builder: (context) {
-        final tabController = DefaultTabController.of(context);
-
-        tabController.addListener(() => tabIndexChanged(tabController));
+        _tabController.addListener(() => tabIndexChanged(_tabController));
 
         return Scaffold(
             appBar: kdAppBar(),
             body: TabBarView(
-                controller: tabController,
+                controller: _tabController,
                 children: [kdTasks(), kdWorkTasks()]),
             onDrawerChanged: (isOpened) {
               if (listForDrawer.isEmpty) {
                 listForDrawer.add("Drawer header");
-                Recources.sections.forEach((element) {
+                for (var element in Recources.sections) {
                   listForDrawer.add(element);
-                });
+                }
                 listForDrawer.add("Настройки");
                 setState(() {});
               }
@@ -276,9 +371,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       ).then((value) {
                         if (value != null) {
                           currentDate = value;
-                          clearListOfTasks();
-                          fetchTasks();
-                          fetchWorkTasks();
+                          _clearListOfTasks();
+                          _fetchTasks();
+                          _fetchWorkTasks();
                           setState(() {});
                         }
                       });
@@ -288,22 +383,52 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Builder(builder: (context) {
                 return IconButton(
                     onPressed: () {
-                      //currentTabIndex = DefaultTabController.of(context).index;
                       setState(() {
                         searchFieldIsOpened = true;
                       });
                     },
                     icon: const Icon(Icons.search));
               }),
+              Stack(
+                children: [
+                  IconButton(
+                      onPressed: _sendCompletedTasks,
+                      icon: const Icon(Icons.send)),
+                  completedTasksCount == 0
+                      ? const SizedBox()
+                      : Container(
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white70,
+                          ),
+                          width: 12,
+                          height: 12,
+                          //color: Colors.amber,
+                          margin: const EdgeInsets.only(left: 20, top: 10),
+                          alignment: Alignment.center,
+                          child: Text(
+                            completedTasksCount.toString(),
+                            style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.red,
+                                fontStyle: FontStyle.normal,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                ],
+              )
             ],
-      bottom: const TabBar(padding: EdgeInsets.all(0), tabs: [
-        Tab(
-          text: "Задания",
-        ),
-        Tab(
-          text: "В работе",
-        )
-      ]),
+      bottom: TabBar(
+          padding: const EdgeInsets.all(0),
+          controller: _tabController,
+          tabs: const [
+            Tab(
+              text: "Задания",
+            ),
+            Tab(
+              text: "В работе",
+            )
+          ]),
     );
   }
 
@@ -320,13 +445,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   : OutlinedButton(
                       onPressed: () {
                         if (sharedData.userName.isEmpty) {
-                          showCustomError(
+                          _showCustomError(
                               context, 'Пожалуйста, авторизуйтесь!');
                         } else {
                           setState(() {
                             _workTasksIsFetching = true;
                           });
-                          fetchWorkTasks();
+                          _fetchWorkTasks();
                         }
                       },
                       child: Row(
@@ -337,34 +462,75 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ],
                       ));
             })
-          : RefreshIndicator(
-              onRefresh: fetchWorkTasks,
-              child: ListView.separated(
-                  itemCount: filteredListOfWorkTasks.length,
-                  separatorBuilder: (context, index) {
-                    return const Divider(
-                      height: 1,
-                    );
-                  },
-                  itemBuilder: (context, index) {
-                    final workTask = filteredListOfWorkTasks[index];
-                    return ListTile(
-                      onTap: () {
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (context) {
-                          return DetailWorkTaskPage(workTask: workTask);
-                        }));
+          : _workTasksIsFetching
+              ? Image.asset(
+                  'assets/images/loading.gif',
+                  height: 50,
+                  width: 50,
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchWorkTasks,
+                  child: ListView.separated(
+                      itemCount: filteredListOfWorkTasks.length,
+                      separatorBuilder: (context, index) {
+                        return const Divider(
+                          height: 1,
+                        );
                       },
-                      title: Text(workTask.docType),
-                      subtitle: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(workTask.number),
-                            Text(DateFormat('dd.MM.yyyy').format(workTask.date))
-                          ]),
-                    );
-                  }),
-            ),
+                      itemBuilder: (context, index) {
+                        final workTask = filteredListOfWorkTasks[index];
+
+                        return GestureDetector(
+                          onLongPressStart: (details) {
+                            showMenu(
+                                context: context,
+                                position: RelativeRect.fromLTRB(
+                                    details.globalPosition.dx,
+                                    details.globalPosition.dy,
+                                    0,
+                                    0),
+                                items: const [
+                                  PopupMenuItem(
+                                    value: 1,
+                                    child: Text("Отменить"),
+                                  )
+                                ]).then((value) =>
+                                _sendCancelledTasks(value, workTask));
+                          },
+                          child: ListTile(
+                            onTap: () {
+                              searchController.clear();
+                              searchFieldIsOpened = false;
+
+                              Navigator.push(context, MaterialPageRoute(
+                                builder: (context) {
+                                  return DetailWorkTaskPage(workTask: workTask);
+                                },
+                              )).then((value) {
+                                DBService.db.countOfCompletedTasks().then(
+                                  (value) {
+                                    completedTasksCount = value;
+                                    setState(() {});
+                                  },
+                                );
+                              });
+                            },
+                            title: Text(workTask.docType),
+                            subtitle: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(workTask.number),
+                                  Text(DateFormat('dd.MM.yyyy')
+                                      .format(workTask.date))
+                                ]),
+                            tileColor: workTask.completed
+                                ? const Color.fromARGB(255, 133, 219, 136)
+                                : Colors.white,
+                          ),
+                        );
+                      }),
+                ),
     );
   }
 
@@ -381,13 +547,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   : OutlinedButton(
                       onPressed: () {
                         if (sharedData.userName.isEmpty) {
-                          showCustomError(
+                          _showCustomError(
                               context, 'Пожалуйста, авторизуйтесь!');
                         } else {
                           setState(() {
                             _tasksIsFetching = true;
                           });
-                          fetchTasks();
+                          _fetchTasks();
                         }
                       },
                       child: Row(
@@ -398,72 +564,78 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         ],
                       ));
             })
-          : RefreshIndicator(
-              onRefresh: fetchTasks,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView.separated(
-                        itemCount: filteredListOfTasks.length,
-                        separatorBuilder: (context, index) => const Divider(
-                              height: 1,
-                            ),
-                        itemBuilder: ((context, index) {
-                          if (filteredListOfTasks.length > index) {
-                            final task = filteredListOfTasks[index];
-
-                            return Padding(
-                              padding: EdgeInsets.zero,
-                              child: ListTile(
-                                leading: task.selected
-                                    ? const Icon(
-                                        Icons.check_box,
-                                        color: Colors.blue,
-                                      )
-                                    : const Icon(
-                                        Icons.check_box_outline_blank,
-                                      ),
-                                title: Padding(
-                                  padding: EdgeInsets.zero,
-                                  child: Text(task.docType),
+          : _tasksIsFetching
+              ? Image.asset(
+                  'assets/images/loading.gif',
+                  height: 50,
+                  width: 50,
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchTasks,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView.separated(
+                            itemCount: filteredListOfTasks.length,
+                            separatorBuilder: (context, index) => const Divider(
+                                  height: 1,
                                 ),
-                                subtitle: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Flexible(child: Text(task.number)),
-                                      Text(DateFormat('dd.MM.yyyy')
-                                          .format(task.date))
-                                    ]),
-                                onTap: () {
-                                  setState(() {
-                                    task.selected = !task.selected;
+                            itemBuilder: ((context, index) {
+                              if (filteredListOfTasks.length > index) {
+                                final task = filteredListOfTasks[index];
 
-                                    countOfSelectedTasks = listOfTasks
-                                        .where((element) =>
-                                            element.selected == true)
-                                        .length;
-                                  });
-                                },
-                              ),
-                            );
-                          }
-                        })),
+                                return Padding(
+                                  padding: EdgeInsets.zero,
+                                  child: ListTile(
+                                    leading: task.selected
+                                        ? const Icon(
+                                            Icons.check_box,
+                                            color: Colors.blue,
+                                          )
+                                        : const Icon(
+                                            Icons.check_box_outline_blank,
+                                          ),
+                                    title: Padding(
+                                      padding: EdgeInsets.zero,
+                                      child: Text(task.docType),
+                                    ),
+                                    subtitle: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Flexible(child: Text(task.number)),
+                                          Text(DateFormat('dd.MM.yyyy')
+                                              .format(task.date))
+                                        ]),
+                                    onTap: () {
+                                      setState(() {
+                                        task.selected = !task.selected;
+
+                                        countOfSelectedTasks = listOfTasks
+                                            .where((element) =>
+                                                element.selected == true)
+                                            .length;
+                                      });
+                                    },
+                                  ),
+                                );
+                              }
+                            })),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: SizedBox(
+                            height: 50,
+                            width: double.infinity,
+                            child: ElevatedButton(
+                                onPressed: _sendAcceptedTasks,
+                                child: Text(countOfSelectedTasks == 0
+                                    ? "Принять задания"
+                                    : "Принять задания ($countOfSelectedTasks)"))),
+                      )
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: SizedBox(
-                        height: 50,
-                        width: double.infinity,
-                        child: ElevatedButton(
-                            onPressed: () {},
-                            child: Text(countOfSelectedTasks == 0
-                                ? "Принять задания"
-                                : "Принять задания ($countOfSelectedTasks)"))),
-                  )
-                ],
-              ),
-            ),
+                ),
     );
   }
 
@@ -542,7 +714,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                     .toList(),
                                 onChanged: (item) {
                                   setState(() {
-                                    clearListOfTasks();
+                                    _clearListOfTasks();
                                     currentWarehouse = item ?? '';
                                     currentWarehouseGUID = sharedData.warehouses
                                         .firstWhere((element) =>
@@ -581,12 +753,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         Navigator.pop(context);
 
                         currentSection = index - 1;
-                        clearListOfTasks();
+                        _clearListOfTasks();
                         countOfSelectedTasks = 0;
 
-                        final tabController = DefaultTabController.of(context);
-                        tabController.index = 0;
-                        tabIndexChanged(tabController);
+                        //final tabController = DefaultTabController.of(context);
+                        _tabController.index = 0;
+                        tabIndexChanged(_tabController);
 
                         if (currentSection < Recources.sections.length) {
                           titleText =

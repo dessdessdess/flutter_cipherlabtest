@@ -2,6 +2,7 @@ class Task {
   final String number;
   final DateTime date;
   final String docType;
+  final String docTypeInternal;
   final String guid;
   bool selected;
 
@@ -9,6 +10,7 @@ class Task {
       {required this.number,
       required this.date,
       required this.docType,
+      required this.docTypeInternal,
       required this.guid,
       required this.selected});
 
@@ -41,11 +43,16 @@ class Task {
 
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
-      number: json['Номер'],
-      date: json['Дата'],
-      docType: json['ВидДокумента'],
-      guid: json['GUID'],
+      number: json['number'],
+      date: DateTime.parse(json['date']),
+      docType: json['docType'],
+      docTypeInternal: json['docTypeInternal'],
+      guid: json['guid'],
       selected: false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'docTypeInternal': docTypeInternal, 'guid': guid};
   }
 }
